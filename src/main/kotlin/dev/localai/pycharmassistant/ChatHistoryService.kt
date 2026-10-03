@@ -34,9 +34,23 @@ data class ChatSessionRecord(
     var id: String = UUID.randomUUID().toString(),
     var title: String = "New chat",
     var messages: MutableList<ChatMessageRecord> = mutableListOf()
-)
+) {
+    fun transcript(): String = messages.joinToString("\n\n", transform = ChatMessageRecord::renderedText)
+
+    fun messageIndexAt(offset: Int): Int {
+        var messageStart = 0
+        messages.forEachIndexed { index, message ->
+            val messageEnd = messageStart + message.renderedText().length
+            if (offset <= messageEnd) return index
+            messageStart = messageEnd + 2
+        }
+        return messages.lastIndex
+    }
+}
 
 data class ChatMessageRecord(
     var fromUser: Boolean = false,
     var text: String = ""
-)
+) {
+    fun renderedText(): String = "${if (fromUser) "You" else "Assistant"}: $text"
+}

@@ -16,8 +16,10 @@ import java.awt.Component
 import java.awt.Dimension
 import java.awt.GridLayout
 import java.awt.Insets
-import javax.swing.DefaultListModel
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Future
 import javax.swing.DefaultListCellRenderer
+import javax.swing.DefaultListModel
 import javax.swing.JButton
 import javax.swing.JList
 import javax.swing.JPanel
@@ -28,6 +30,7 @@ class ChatToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val history = project.getService(ChatHistoryService::class.java)
         val busySessionIds = mutableSetOf<String>()
+        val requestFutures = ConcurrentHashMap<String, Future<*>>()
         if (history.state.sessions.isEmpty()) history.state.sessions.add(ChatSessionRecord(title = "New chat"))
 
         val sessionListModel = DefaultListModel<ChatSessionRecord>()
@@ -63,11 +66,21 @@ class ChatToolWindowFactory : ToolWindowFactory {
             margin = Insets(8, 8, 8, 8)
         }
         val newButton = JButton("New chat")
-        val deleteButton = JButton("Delete chat")
+        val deleteChatButton = JButton("Delete chat")
+        val deleteMessageButton = JButton("Delete message")
+        val copyButton = JButton("Copy chat")
         val sendButton = JButton("Send")
         val sessionToolbar = JPanel(GridLayout(0, 1, 0, 4)).apply {
             add(newButton)
-            add(deleteButton)
+            add(deleteChatButton)
+        }
+        val messageToolbar = JPanel(GridLayout(1, 0, 4, 0)).apply {
+            add(copyButton)
+            add(deleteMessageButton)
+        }
+        val transcriptPanel = JPanel(BorderLayout(0, 4)).apply {
+            add(messageToolbar, BorderLayout.NORTH)
+            add(JBScrollPane(messagesArea), BorderLayout.CENTER)
         }
         val sessionPanel = JPanel(BorderLayout(0, 4)).apply {
             preferredSize = Dimension(150, 100)
@@ -80,19 +93,20 @@ class ChatToolWindowFactory : ToolWindowFactory {
         }
         val chatPanel = JPanel(BorderLayout()).apply {
             add(sessionPanel, BorderLayout.WEST)
-            add(JBScrollPane(messagesArea), BorderLayout.CENTER)
+            add(transcriptPanel, BorderLayout.CENTER)
             add(bottomPanel, BorderLayout.SOUTH)
         }
 
         fun selectedSession(): ChatSessionRecord? = sessionList.selectedValue
 
         fun renderSession(session: ChatSessionRecord?) {
-            messagesArea.text = session?.messages?.joinToString("\n\n") { message ->
-                "${if (message.fromUser) "You" else "Assistant"}: ${message.text}"
-            }.orEmpty()
+            messagesArea.text = session?.transcript().orEmpty()
             messagesArea.caretPosition = messagesArea.document.length
-            deleteButton.isEnabled = session != null
-            sendButton.isEnabled = session != null && session.id !in busySessionIds
+            deleteChatButton.isEnabled = session != null
+            deleteMessageButton.isEnabled = session?.messages?.isNotEmpty() == true
+            copyButton.isEnabled = session?.messages?.isNotEmpty() == true
+            sendButton.text = if (session?.id in busySessionIds) "Stop" else "Send"
+            sendButton.isEnabled = session != null
         }
 
         fun createSession() {
@@ -103,11 +117,21 @@ class ChatToolWindowFactory : ToolWindowFactory {
             renderSession(session)
         }
 
+        fun renderCurrentSession() = renderSession(selectedSession())
+
+        fun deleteMessageAt(offset: Int) {
+            val session = selectedSession() ?: return
+            if (session.messages.isEmpty()) return
+            val messageIndex = session.messageIndexAt(offset.coerceIn(0, messagesArea.document.length))
+            if (messageIndex >= 0) session.messages.removeAt(messageIndex)
+            renderSession(session)
+        }
+
         sessionList.addListSelectionListener {
-            if (!it.valueIsAdjusting) renderSession(selectedSession())
+            if (!it.valueIsAdjusting) renderCurrentSession()
         }
         newButton.addActionListener { createSession() }
-        deleteButton.addActionListener {
+        deleteChatButton.addActionListener {
             val session = selectedSession() ?: return@addActionListener
             val confirmed = Messages.showYesNoDialog(
                 project,
@@ -117,20 +141,40 @@ class ChatToolWindowFactory : ToolWindowFactory {
             ) == Messages.YES
             if (!confirmed) return@addActionListener
 
+            requestFutures.remove(session.id)?.cancel(true)
+            busySessionIds.remove(session.id)
             val index = sessionList.selectedIndex
             history.state.sessions.removeAll { it.id == session.id }
-            busySessionIds.remove(session.id)
             sessionListModel.removeElement(session)
-            if (sessionListModel.isEmpty) {
-                createSession()
-            } else {
-                sessionList.selectedIndex = index.coerceAtMost(sessionListModel.size() - 1)
+            if (sessionListModel.isEmpty) createSession()
+            else sessionList.selectedIndex = index.coerceAtMost(sessionListModel.size() - 1)
+        }
+        deleteMessageButton.addActionListener {
+            val session = selectedSession() ?: return@addActionListener
+            if (session.messages.isEmpty()) return@addActionListener
+            val selectedText = messagesArea.selectedText
+            val offset = if (!selectedText.isNullOrEmpty()) messagesArea.selectionStart else messagesArea.caretPosition
+            deleteMessageAt(offset)
+        }
+        copyButton.addActionListener {
+            val session = selectedSession() ?: return@addActionListener
+            val transcript = session.transcript()
+            if (transcript.isNotBlank()) {
+                val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+                clipboard.setContents(java.awt.datatransfer.StringSelection(transcript), null)
             }
         }
         sendButton.addActionListener {
             val session = selectedSession() ?: return@addActionListener
+            if (session.id in busySessionIds) {
+                requestFutures.remove(session.id)?.cancel(true)
+                busySessionIds.remove(session.id)
+                sendButton.text = "Send"
+                sendButton.isEnabled = true
+                return@addActionListener
+            }
             val userText = inputArea.text.trim()
-            if (userText.isBlank() || session.id in busySessionIds) return@addActionListener
+            if (userText.isBlank()) return@addActionListener
 
             session.messages.add(ChatMessageRecord(fromUser = true, text = userText))
             if (session.title == "New chat") {
@@ -139,11 +183,11 @@ class ChatToolWindowFactory : ToolWindowFactory {
             }
             inputArea.text = ""
             busySessionIds.add(session.id)
+            sendButton.text = "Stop"
             renderSession(session)
             val sessionId = session.id
             val conversation = session.messages.toList()
-
-            ApplicationManager.getApplication().executeOnPooledThread {
+            val future = ApplicationManager.getApplication().executeOnPooledThread {
                 val reply = runCatching {
                     val settings = AssistantSettings.getInstance()
                     val promptTemplate = settings.getPromptTemplate()
@@ -160,19 +204,24 @@ class ChatToolWindowFactory : ToolWindowFactory {
                     )
                 }
                 ApplicationManager.getApplication().invokeLater {
+                    if (sessionId !in busySessionIds) return@invokeLater
                     val targetSession = history.state.sessions.firstOrNull { it.id == sessionId }
                         ?: return@invokeLater
+                    requestFutures.remove(sessionId)
                     busySessionIds.remove(sessionId)
                     reply.onSuccess { targetSession.messages.add(ChatMessageRecord(fromUser = false, text = it)) }
                         .onFailure {
-                            targetSession.messages.add(
-                                ChatMessageRecord(fromUser = false, text = it.message ?: "Request failed.")
-                            )
+                            if (it !is java.util.concurrent.CancellationException && !Thread.currentThread().isInterrupted) {
+                                targetSession.messages.add(
+                                    ChatMessageRecord(fromUser = false, text = it.message ?: "Request failed.")
+                                )
+                            }
                         }
                     if (selectedSession()?.id == sessionId) renderSession(targetSession)
                     else sessionList.repaint()
                 }
             }
+            requestFutures[sessionId] = future
         }
 
         sessionList.selectedIndex = 0

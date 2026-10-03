@@ -7,7 +7,7 @@
 - 在编辑器中按 `Ctrl+Alt+Space` 请求光标处的代码续写；结果显示为补全候选，按 `Tab` 接受，按 `Esc` 忽略。
 - 补全请求默认会引用当前选区和当前文件全文；可在设置中分别关闭“引用选中文本”和“引用当前文件全文”。
 - 在设置中可启用 Ollama 模式（默认关闭），通过本机或自定义 Ollama 服务的 `/api/chat` 接口完成补全、代码解释和聊天，无需 API Key。
-- 聊天侧边栏顶部提供“New chat”和“Delete chat”按钮，可新建、切换和删除会话；每个项目的会话与消息保存在项目 workspace 配置中，IDE 重启后仍会恢复。
+- 聊天侧边栏支持新建、删除会话，停止当前 AI 回复，删除单条消息，以及复制完整会话；会话与消息保存在项目 workspace 配置中，IDE 重启后仍会恢复。
 - 自动补全等待秒数可配置（1–30 秒，默认 2 秒）；默认要求等待期间光标保持不动，代码变化会重新开始计时。
 - 在选中代码后，从编辑器右键菜单选择 **OpenAI Assistant > Explain Selection with AI** 获取解释。
 - 在 **Settings > Tools > OpenAI Code Assistant** 配置 OpenAI 兼容 API，或启用 Ollama 并配置 Ollama 地址和模型；请求超时、提示词和上下文设置对两种模式生效。
