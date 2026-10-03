@@ -1,0 +1,44 @@
+<idea-plugin>
+    <id>dev.localai.pycharm-assistant</id>
+    <name>OpenAI Code Assistant</name>
+    <vendor>Local AI Tools</vendor>
+    <description><![CDATA[
+        OpenAI-compatible code completion and assistant actions for PyCharm Community.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="dev.localai.pycharmassistant.settings.AssistantSettings" />
+        <applicationService serviceImplementation="dev.localai.pycharmassistant.AiAutoCompleteService" />
+        <projectService serviceImplementation="dev.localai.pycharmassistant.ChatHistoryService" />
+        <postStartupActivity implementation="dev.localai.pycharmassistant.AiAutoCompleteStartupActivity" />
+        <applicationConfigurable
+                parentId="tools"
+                instance="dev.localai.pycharmassistant.settings.AssistantConfigurable"
+                id="dev.localai.pycharmassistant.settings"
+                displayName="OpenAI Code Assistant" />
+        <toolWindow
+                id="AI Assistant Chat"
+                anchor="right"
+                secondary="false"
+                factoryClass="dev.localai.pycharmassistant.ChatToolWindowFactory"
+                icon="AllIcons.General.Information" />
+    </extensions>
+
+    <actions>
+        <group id="dev.localai.pycharmassistant.actions" text="OpenAI Assistant" popup="true">
+            <add-to-group group-id="EditorPopupMenu" anchor="last" />
+            <action id="dev.localai.pycharmassistant.complete"
+                    class="dev.localai.pycharmassistant.actions.GenerateCompletionAction"
+                    text="Generate AI Completion"
+                    description="Ask the configured model to complete code at the caret">
+                <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt SPACE" />
+            </action>
+            <action id="dev.localai.pycharmassistant.explain"
+                    class="dev.localai.pycharmassistant.actions.ExplainSelectionAction"
+                    text="Explain Selection with AI"
+                    description="Explain the selected code using the configured model" />
+        </group>
+    </actions>
+</idea-plugin>
