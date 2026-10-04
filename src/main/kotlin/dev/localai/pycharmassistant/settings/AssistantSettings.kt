@@ -24,7 +24,13 @@ class AssistantSettings : PersistentStateComponent<AssistantSettings.SettingsSta
         var includeSelectionInCompletion: Boolean = true,
         var includeFullFileInCompletion: Boolean = true,
         var autoCompleteDelaySeconds: Int = 2,
-        var requireStableCaretForAutoComplete: Boolean = true
+        var requireStableCaretForAutoComplete: Boolean = true,
+        var customPrompts: MutableList<CustomPrompt> = mutableListOf()
+    )
+
+    data class CustomPrompt(
+        var name: String = "Custom prompt",
+        var instruction: String = ""
     )
 
     private var settingsState = SettingsState()

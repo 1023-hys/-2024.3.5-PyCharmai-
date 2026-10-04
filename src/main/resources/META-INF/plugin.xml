@@ -39,6 +39,70 @@
                     class="dev.localai.pycharmassistant.actions.ExplainSelectionAction"
                     text="Explain Selection with AI"
                     description="Explain the selected code using the configured model" />
+            <separator />
+            <group id="dev.localai.pycharmassistant.codeTools" text="Code Tools" popup="true">
+                <action id="dev.localai.pycharmassistant.generateDocumentation"
+                        class="dev.localai.pycharmassistant.actions.GenerateDocumentationAction"
+                        text="Generate Documentation"
+                        description="Generate documentation for the selected code or current file" />
+                <action id="dev.localai.pycharmassistant.suggestNames"
+                        class="dev.localai.pycharmassistant.actions.SuggestNamesAction"
+                        text="Suggest Better Names"
+                        description="Suggest clearer names for the selected code" />
+                <action id="dev.localai.pycharmassistant.suggestRefactoring"
+                        class="dev.localai.pycharmassistant.actions.SuggestRefactoringAction"
+                        text="Suggest Refactoring"
+                        description="Suggest refactorings for the selected code or current file" />
+                <action id="dev.localai.pycharmassistant.findBugs"
+                        class="dev.localai.pycharmassistant.actions.FindBugsAction"
+                        text="Find Bugs and Suggest Fixes"
+                        description="Review the code for bugs and propose corrections" />
+                <action id="dev.localai.pycharmassistant.generateTests"
+                        class="dev.localai.pycharmassistant.actions.GenerateTestsAction"
+                        text="Generate Unit Tests"
+                        description="Generate unit tests for the selected code or current file" />
+                <action id="dev.localai.pycharmassistant.convertLanguage"
+                        class="dev.localai.pycharmassistant.actions.ConvertLanguageAction"
+                        text="Convert to Another Language"
+                        description="Convert the selected code to another programming language" />
+                <action id="dev.localai.pycharmassistant.generateCode"
+                        class="dev.localai.pycharmassistant.actions.GenerateCodeFromDescriptionAction"
+                        text="Generate Code from Description"
+                        description="Generate code that satisfies a natural-language description" />
+                <action id="dev.localai.pycharmassistant.explainRuntimeError"
+                        class="dev.localai.pycharmassistant.actions.ExplainRuntimeErrorAction"
+                        text="Explain Runtime Error"
+                        description="Explain a pasted runtime error or stack trace" />
+            </group>
+            <group id="dev.localai.pycharmassistant.ask" text="Ask AI" popup="true">
+                <action id="dev.localai.pycharmassistant.askProgramming"
+                        class="dev.localai.pycharmassistant.actions.AskProgrammingQuestionAction"
+                        text="Ask a Programming Question"
+                        description="Ask a general programming question" />
+                <action id="dev.localai.pycharmassistant.askProjectCode"
+                        class="dev.localai.pycharmassistant.actions.AskProjectCodeQuestionAction"
+                        text="Ask About Project Code"
+                        description="Ask a question about the current file or selection" />
+            </group>
+            <group id="dev.localai.pycharmassistant.vcs" text="Git &amp; VCS" popup="true">
+                <action id="dev.localai.pycharmassistant.generateCommitMessage"
+                        class="dev.localai.pycharmassistant.actions.GenerateCommitMessageAction"
+                        text="Generate Commit Message"
+                        description="Generate a commit message from the current git changes" />
+                <action id="dev.localai.pycharmassistant.explainCommit"
+                        class="dev.localai.pycharmassistant.actions.ExplainCommitAction"
+                        text="Explain Commit"
+                        description="Explain a git commit from its metadata and diff" />
+                <action id="dev.localai.pycharmassistant.askVcs"
+                        class="dev.localai.pycharmassistant.actions.AskVcsQuestionAction"
+                        text="Ask About VCS"
+                        description="Ask a question using current git status and recent history" />
+            </group>
+            <separator />
+            <action id="dev.localai.pycharmassistant.promptLibrary"
+                    class="dev.localai.pycharmassistant.actions.PromptLibraryAction"
+                    text="Prompt Library..."
+                    description="Run a built-in or custom prompt against the selected code" />
         </group>
     </actions>
 </idea-plugin>

@@ -1,8 +1,11 @@
 package dev.localai.pycharmassistant
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.fileChooser.FileChooser
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBList
@@ -66,12 +69,15 @@ class ChatToolWindowFactory : ToolWindowFactory {
             margin = Insets(8, 8, 8, 8)
         }
         val newButton = JButton("New chat")
+        val renameChatButton = JButton("Rename chat")
         val deleteChatButton = JButton("Delete chat")
         val deleteMessageButton = JButton("Delete message")
         val copyButton = JButton("Copy chat")
         val sendButton = JButton("Send")
+        val attachFileButton = JButton("Attach file")
         val sessionToolbar = JPanel(GridLayout(0, 1, 0, 4)).apply {
             add(newButton)
+            add(renameChatButton)
             add(deleteChatButton)
         }
         val messageToolbar = JPanel(GridLayout(1, 0, 4, 0)).apply {
@@ -88,6 +94,7 @@ class ChatToolWindowFactory : ToolWindowFactory {
             add(JBScrollPane(sessionList), BorderLayout.CENTER)
         }
         val bottomPanel = JPanel(BorderLayout()).apply {
+            add(JPanel().apply { add(attachFileButton) }, BorderLayout.NORTH)
             add(JBScrollPane(inputArea), BorderLayout.CENTER)
             add(sendButton, BorderLayout.EAST)
         }
@@ -102,6 +109,7 @@ class ChatToolWindowFactory : ToolWindowFactory {
         fun renderSession(session: ChatSessionRecord?) {
             messagesArea.text = session?.transcript().orEmpty()
             messagesArea.caretPosition = messagesArea.document.length
+            renameChatButton.isEnabled = session != null
             deleteChatButton.isEnabled = session != null
             deleteMessageButton.isEnabled = session?.messages?.isNotEmpty() == true
             copyButton.isEnabled = session?.messages?.isNotEmpty() == true
@@ -131,6 +139,21 @@ class ChatToolWindowFactory : ToolWindowFactory {
             if (!it.valueIsAdjusting) renderCurrentSession()
         }
         newButton.addActionListener { createSession() }
+        renameChatButton.addActionListener {
+            val session = selectedSession() ?: return@addActionListener
+            val newTitle = Messages.showInputDialog(
+                project,
+                "Enter a new title for this chat:",
+                "Rename Chat",
+                Messages.getQuestionIcon(),
+                session.title,
+                null
+            )?.trim()
+            if (!newTitle.isNullOrEmpty() && newTitle != session.title) {
+                session.title = newTitle
+                sessionList.repaint()
+            }
+        }
         deleteChatButton.addActionListener {
             val session = selectedSession() ?: return@addActionListener
             val confirmed = Messages.showYesNoDialog(
@@ -162,6 +185,29 @@ class ChatToolWindowFactory : ToolWindowFactory {
             if (transcript.isNotBlank()) {
                 val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
                 clipboard.setContents(java.awt.datatransfer.StringSelection(transcript), null)
+            }
+        }
+        attachFileButton.addActionListener {
+            val descriptor = FileChooserDescriptor(true, false, false, false, false, false)
+            FileChooser.chooseFile(descriptor, project, null) { file ->
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    val content = runCatching { VfsUtil.loadText(file) }.getOrNull()
+                    ApplicationManager.getApplication().invokeLater {
+                        if (project.isDisposed) return@invokeLater
+                        if (content == null) {
+                            Messages.showErrorDialog(project, "Could not read ${file.name}.", "Attach File")
+                            return@invokeLater
+                        }
+                        val clipped = if (content.length > MAX_ATTACH_CHARS) {
+                            content.take(MAX_ATTACH_CHARS) + "\n... (truncated)"
+                        } else {
+                            content
+                        }
+                        val prefix = if (inputArea.text.isNullOrBlank()) "" else "\n\n"
+                        inputArea.text = "${inputArea.text}$prefix[Reference file: ${file.path}]\n```\n$clipped\n```"
+                        inputArea.caretPosition = inputArea.document.length
+                    }
+                }
             }
         }
         sendButton.addActionListener {
@@ -228,5 +274,9 @@ class ChatToolWindowFactory : ToolWindowFactory {
         renderSession(sessionList.selectedValue)
         val content = ContentFactory.getInstance().createContent(chatPanel, "", false)
         toolWindow.contentManager.addContent(content)
+    }
+
+    private companion object {
+        const val MAX_ATTACH_CHARS = 20_000
     }
 }
